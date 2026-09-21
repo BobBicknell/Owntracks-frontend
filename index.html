@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnTracks Heatmap Viewer</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <header class="toolbar">
+      <span class="brand">OwnTracks</span>
+      <label>
+        User
+        <select id="user-select"></select>
+      </label>
+      <label>
+        Device
+        <select id="device-select"></select>
+      </label>
+      <label>
+        From
+        <input type="date" id="from-date" />
+      </label>
+      <label>
+        To
+        <input type="date" id="to-date" />
+      </label>
+      <button id="load-btn">Load</button>
+      <label class="check">
+        <input type="checkbox" id="heat-toggle" checked />
+        Heatmap
+      </label>
+      <label class="check">
+        <input type="checkbox" id="track-toggle" />
+        Track
+      </label>
+      <label class="check">
+        <input type="checkbox" id="waypoint-toggle" />
+        Waypoints
+      </label>
+      <span id="status" class="status"></span>
+    </header>
+
+    <main id="map"></main>
+  </body>
+</html>
