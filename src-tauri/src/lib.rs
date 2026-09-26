@@ -52,7 +52,6 @@ fn get_track(
     Ok(points.as_ref().clone())
 }
 
-#[cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let store = match Store::open() {

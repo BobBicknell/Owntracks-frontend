@@ -215,19 +215,37 @@ function drawHeat(cells: HeatmapCell[]) {
   heatLayer = null;
   if (!heatToggle.checked) return;
 
+  // Normalize against the 90th percentile count (cells are sorted desc) so
+  // the ~10% densest cells saturate while the rest span the full gradient.
+  // Max-based scaling washes everything out when one cell (home, work) dwarfs
+  // the rest.
   const latlngs: Array<[number, number, number]> = [];
-  let maxCount = 1;
-  for (const c of cells) maxCount = Math.max(maxCount, c.count);
+  const hot = cells.reduce((m, c) => Math.max(m, c.count), 1);
+  const p90 =
+    cells.length > 1
+      ? Math.max(1, cells[Math.floor(cells.length * 0.1)].count)
+      : hot;
+  const scale = Math.log(p90 + 1) || 1;
   for (const c of cells) {
-    // sqrt scales the intensity so a few dense cells don't drown the rest.
-    const intensity = 0.05 + 0.95 * Math.sqrt(c.count / maxCount);
-    latlngs.push([c.lat, c.lon, intensity]);
+    const t = Math.min(1, Math.log(c.count + 1) / scale);
+    latlngs.push([c.lat, c.lon, 0.2 + 0.8 * t]);
   }
   if (latlngs.length === 0) return;
 
   const zoom = map.getZoom();
-  const radius = Math.max(14, 46 - zoom * 1.8);
-  heatLayer = L.heatLayer(latlngs, { radius, blur: radius * 0.8, maxZoom: 19 }).addTo(map);
+  const radius = Math.max(16, 46 - zoom * 1.5);
+  heatLayer = L.heatLayer(latlngs, {
+    radius,
+    blur: radius * 0.55,
+    minOpacity: 0.15,
+    gradient: {
+      0.0: "#0000cd",
+      0.3: "#00bfff",
+      0.5: "#00ff7f",
+      0.7: "#ffff00",
+      1.0: "#ff0000",
+    },
+  }).addTo(map);
 }
 
 async function ensureTrack(): Promise<LocationPoint[] | null> {
@@ -248,6 +266,47 @@ async function ensureTrack(): Promise<LocationPoint[] | null> {
   return trackPoints;
 }
 
+// Approximate ground distance in meters (equirectangular, fine for this scale).
+function metersBetween(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const latMid = ((a.lat + b.lat) / 2) * (Math.PI / 180);
+  const dx = (b.lon - a.lon) * Math.cos(latMid) * 111_320;
+  const dy = (b.lat - a.lat) * 110_540;
+  return Math.hypot(dx, dy);
+}
+
+// Decimate points closer than `minMeters` apart, then apply two passes of a
+// centered moving average. Removes GPS jitter (the "jagged" look) while
+// keeping the overall path faithful.
+function smoothTrack(raw: LocationPoint[]): Array<{ lat: number; lon: number }> {
+  const minMeters = 12;
+  const maxPoints = 6000;
+
+  let pts: Array<{ lat: number; lon: number }> = [];
+  for (const p of raw) {
+    if (pts.length === 0 || metersBetween(pts[pts.length - 1], p) >= minMeters) {
+      pts.push({ lat: p.lat, lon: p.lon });
+    }
+  }
+  if (pts.length > maxPoints) {
+    const step = Math.ceil(pts.length / maxPoints);
+    pts = pts.filter((_, i) => i % step === 0);
+  }
+
+  for (let pass = 0; pass < 2; pass++) {
+    const smoothed = pts.map((p, i) => {
+      if (i === 0 || i === pts.length - 1) return p;
+      const a = pts[i - 1];
+      const c = pts[i + 1];
+      return { lat: (a.lat + p.lat * 2 + c.lat) / 4, lon: (a.lon + p.lon * 2 + c.lon) / 4 };
+    });
+    pts = smoothed;
+  }
+  return pts;
+}
+
 async function drawTrack() {
   trackLayer?.remove();
   trackLayer = null;
@@ -256,14 +315,14 @@ async function drawTrack() {
   const raw = await ensureTrack();
   if (!raw || raw.length < 2) return;
 
-  const stride = Math.max(1, Math.ceil(raw.length / 4000));
-  const latlngs = raw
-    .filter((_, i) => i % stride === 0)
-    .map((p) => L.latLng(p.lat, p.lon));
+  const pts = smoothTrack(raw);
+  const latlngs = pts.map((p) => L.latLng(p.lat, p.lon));
   trackLayer = L.polyline(latlngs, {
     color: "#89b4fa",
-    weight: 2,
-    opacity: 0.7,
+    weight: 3,
+    opacity: 0.9,
+    lineJoin: "round",
+    lineCap: "round",
   }).addTo(map);
 }
 
