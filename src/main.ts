@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import "./styles.css";
+import { attachDatePicker } from "./datepicker";
 
 interface UserEntry {
   user: string;
@@ -74,6 +75,9 @@ const heatToggle = document.querySelector<HTMLInputElement>("#heat-toggle")!;
 const trackToggle = document.querySelector<HTMLInputElement>("#track-toggle")!;
 const waypointToggle = document.querySelector<HTMLInputElement>("#waypoint-toggle")!;
 const statusEl = document.querySelector<HTMLSpanElement>("#status")!;
+
+attachDatePicker(fromDate);
+attachDatePicker(toDate);
 
 // ---- Helpers ---------------------------------------------------------------
 
